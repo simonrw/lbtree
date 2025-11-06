@@ -5,7 +5,10 @@ use aws_sdk_elasticloadbalancingv2::types::{
 };
 use clap::Parser;
 use color_eyre::eyre::{self, Context};
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::{
+    io::{AsyncReadExt, AsyncWriteExt},
+    task::JoinHandle,
+};
 
 #[derive(Parser)]
 struct Args {
@@ -13,7 +16,7 @@ struct Args {
     load_balancer_arn: Option<String>,
 }
 
-trait Present: std::fmt::Debug {
+trait Present: std::fmt::Debug + Send + Sync + 'static {
     fn content(&self) -> String;
 
     fn indent(&self) -> usize;
@@ -80,7 +83,7 @@ impl Present for Action {
             }
             ActionTypeEnum::Forward => {
                 let _fwd = self.forward_config().unwrap();
-                format!("Action (forward)")
+                "Action (forward)".to_string()
             }
             ActionTypeEnum::Redirect => todo!(),
             _ => todo!(),
@@ -132,7 +135,7 @@ async fn select_lbs(
         .await
         .context("describing load balancers")?
         .load_balancers()
-        .into_iter()
+        .iter()
         .map(|lb| lb.load_balancer_arn().unwrap())
         .collect::<Vec<_>>()
         .join("\n");
@@ -174,9 +177,6 @@ async fn main() -> eyre::Result<()> {
             .await?
             .ok_or_else(|| eyre::eyre!("no lb selected"))?
     };
-    // let lb_arn = args.load_balancer_arn.unwrap_or_else(|| {
-    //     let selected_lb = select_lbs(client).await.unwrap()
-    // });
 
     let load_balancer = client
         .describe_load_balancers()
@@ -189,68 +189,93 @@ async fn main() -> eyre::Result<()> {
     let lb = &load_balancer.load_balancers()[0];
     lb.present();
 
-    // listeners
+    // parallel fetch of the results
 
-    let listeners = client
-        .describe_listeners()
-        .load_balancer_arn(&lb_arn)
-        .send()
-        .await
-        .wrap_err("describing listeners for load balancer")?;
+    let listeners_client = client.clone();
+    let listeners_lb_arn = lb_arn.clone();
+    let listeners_fut: JoinHandle<eyre::Result<Vec<Box<dyn Present>>>> = tokio::spawn(async move {
+        let mut out: Vec<Box<dyn Present>> = Vec::new();
 
-    for listener in listeners.listeners() {
-        listener.present();
-        let listener_arn = if let Some(arn) = listener.listener_arn() {
-            arn
-        } else {
-            continue;
-        };
-
-        // - rules
-        let rules = client
-            .describe_rules()
-            .listener_arn(listener_arn)
+        let listeners = listeners_client
+            .describe_listeners()
+            .load_balancer_arn(listeners_lb_arn)
             .send()
             .await
-            .context("describing rules for listener")?;
+            .wrap_err("describing listeners for load balancer")?;
 
-        for rule in rules.rules() {
-            rule.present();
+        for listener in listeners.listeners() {
+            out.push(Box::new(listener.clone()));
 
-            for action in rule.actions() {
-                action.present();
+            let listener_arn = if let Some(arn) = listener.listener_arn() {
+                arn
+            } else {
+                continue;
+            };
+
+            // - rules
+            let rules = listeners_client
+                .describe_rules()
+                .listener_arn(listener_arn)
+                .send()
+                .await
+                .context("describing rules for listener")?;
+
+            for rule in rules.rules() {
+                out.push(Box::new(rule.clone()));
+
+                for action in rule.actions() {
+                    out.push(Box::new(action.clone()));
+                }
             }
         }
+
+        Ok(out)
+    });
+    let target_groups_client = client.clone();
+    let target_groups_lb_arn = lb_arn.clone();
+    let target_groups_fut: JoinHandle<eyre::Result<Vec<Box<dyn Present>>>> =
+        tokio::spawn(async move {
+            let mut out: Vec<Box<dyn Present>> = Vec::new();
+            let target_groups = target_groups_client
+                .describe_target_groups()
+                .load_balancer_arn(target_groups_lb_arn)
+                .send()
+                .await
+                .context("describing target groups")?;
+
+            for target_group in target_groups.target_groups() {
+                out.push(Box::new(target_group.clone()));
+
+                let tg_arn = if let Some(arn) = target_group.target_group_arn() {
+                    arn
+                } else {
+                    continue;
+                };
+
+                // - targets
+                let targets = target_groups_client
+                    .describe_target_health()
+                    .target_group_arn(tg_arn)
+                    .send()
+                    .await
+                    .wrap_err("describing targets in target group")?;
+
+                for target in targets.target_health_descriptions() {
+                    out.push(Box::new(target.clone()));
+                }
+            }
+            Ok(out)
+        });
+
+    for presenter in listeners_fut.await?? {
+        presenter.present();
+    }
+    for presenter in target_groups_fut.await?? {
+        presenter.present();
     }
 
+    // listeners
     // target groups
-    let target_groups = client
-        .describe_target_groups()
-        .load_balancer_arn(&lb_arn)
-        .send()
-        .await
-        .context("describing target groups")?;
-
-    for target_group in target_groups.target_groups() {
-        target_group.present();
-        let tg_arn = if let Some(arn) = target_group.target_group_arn() {
-            arn
-        } else {
-            continue;
-        };
-
-        // - targets
-        let targets = client
-            .describe_target_health()
-            .target_group_arn(tg_arn)
-            .send()
-            .await
-            .wrap_err("describing targets in target group")?;
-
-        for target in targets.target_health_descriptions() {
-            target.present();
-        }
-    }
 
     Ok(())
 }
