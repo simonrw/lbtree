@@ -1,19 +1,34 @@
-use std::process::Stdio;
-
 use aws_sdk_elasticloadbalancingv2::types::{
     Action, ActionTypeEnum, Listener, LoadBalancer, Rule, TargetGroup, TargetHealthDescription,
 };
 use clap::Parser;
 use color_eyre::eyre::{self, Context};
-use tokio::{
-    io::{AsyncReadExt, AsyncWriteExt},
-    task::JoinHandle,
-};
+use crossbeam::channel::unbounded;
+use skim::prelude::*;
+use std::borrow::Cow;
+use std::sync::Arc;
+use tokio::task::JoinHandle;
 
 #[derive(Parser)]
 struct Args {
     #[clap(short, long)]
     load_balancer_arn: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+struct LoadBalancerItem {
+    display: String, // What user sees: "name (dns-name)"
+    arn: String,     // What gets returned when selected
+}
+
+impl SkimItem for LoadBalancerItem {
+    fn text(&self) -> Cow<'_, str> {
+        Cow::Borrowed(&self.display)
+    }
+
+    fn output(&self) -> Cow<'_, str> {
+        Cow::Borrowed(&self.arn)
+    }
 }
 
 trait Present: std::fmt::Debug + Send + Sync + 'static {
@@ -129,38 +144,83 @@ impl Present for TargetHealthDescription {
 async fn select_lbs(
     client: &aws_sdk_elasticloadbalancingv2::Client,
 ) -> eyre::Result<Option<String>> {
-    let lb_arns: String = client
-        .describe_load_balancers()
-        .send()
+    // Create crossbeam channel for streaming items to skim
+    let (tx, rx): (SkimItemSender, SkimItemReceiver) = unbounded();
+
+    // Clone client for background task
+    let client = client.clone();
+
+    // Spawn background task to fetch and stream load balancers
+    let fetch_handle = tokio::spawn(async move {
+        let result: eyre::Result<()> = async {
+            // Use paginator to stream results as they arrive
+            let mut paginator = client.describe_load_balancers().into_paginator().send();
+
+            // Stream each page as it arrives from AWS
+            while let Some(page) = paginator.next().await {
+                let page = page.context("fetching load balancers page")?;
+
+                // Send each LB to skim immediately
+                for lb in page.load_balancers() {
+                    let name = lb.load_balancer_name().unwrap_or("unknown");
+                    let dns = lb.dns_name().unwrap_or("unknown");
+                    let arn = lb.load_balancer_arn().unwrap_or("");
+
+                    let item = LoadBalancerItem {
+                        display: format!("{} ({})", name, dns),
+                        arn: arn.to_string(),
+                    };
+
+                    // Send to skim (crossbeam send is fast)
+                    // Ignore send errors - means user closed skim early
+                    let _ = tx.send(Arc::new(item));
+                }
+            }
+
+            Ok(())
+        }
+        .await;
+
+        // Drop sender to signal EOF to skim
+        drop(tx);
+
+        result
+    });
+
+    // Configure skim options
+    let options = SkimOptionsBuilder::default()
+        .height(Some("50%"))
+        .prompt(Some("Select load balancer: "))
+        .build()
+        .map_err(|e| eyre::eyre!("building skim options: {}", e))?;
+
+    // Start skim UI immediately (receives items as they arrive)
+    let selected = Skim::run_with(&options, Some(rx));
+
+    // Wait for background task and check for errors
+    let fetch_result = fetch_handle
         .await
-        .context("describing load balancers")?
-        .load_balancers()
-        .iter()
-        .map(|lb| lb.load_balancer_arn().unwrap())
-        .collect::<Vec<_>>()
-        .join("\n");
+        .context("background fetch task panicked")?;
 
-    let mut proc = tokio::process::Command::new("fzf")
-        .stdin(Stdio::piped())
-        .stderr(Stdio::piped())
-        .stdout(Stdio::piped())
-        .spawn()
-        .unwrap();
+    // Propagate any AWS API errors
+    fetch_result?;
 
-    {
-        let mut stdin = proc.stdin.take().expect("failed to open stdin");
-        stdin.write_all(lb_arns.as_bytes()).await?;
-        drop(stdin);
-    }
+    // Extract selection
+    let selected = match selected {
+        Some(output) => {
+            if output.is_abort {
+                return Ok(None);
+            }
 
-    let mut stdout = String::new();
-    if let Some(mut out) = proc.stdout.take() {
-        out.read_to_string(&mut stdout).await?;
-    }
+            output
+                .selected_items
+                .first()
+                .map(|item| item.output().to_string())
+        }
+        None => None,
+    };
 
-    let _status = proc.wait().await?;
-
-    Ok(Some(stdout.trim().to_string()))
+    Ok(selected)
 }
 
 #[tokio::main]
@@ -173,9 +233,13 @@ async fn main() -> eyre::Result<()> {
     let lb_arn = if let Some(arn) = args.load_balancer_arn {
         arn
     } else {
-        select_lbs(&client)
-            .await?
-            .ok_or_else(|| eyre::eyre!("no lb selected"))?
+        match select_lbs(&client).await? {
+            Some(arn) => arn,
+            None => {
+                eprintln!("No load balancer selected");
+                std::process::exit(1);
+            }
+        }
     };
 
     let load_balancer = client

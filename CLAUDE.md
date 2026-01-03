@@ -20,7 +20,7 @@ cargo build
 # With load balancer ARN specified
 cargo run -- --load-balancer-arn <ARN>
 
-# Interactive mode (uses fzf to select from available load balancers)
+# Interactive mode (uses skim to select from available load balancers)
 cargo run
 ```
 
@@ -47,8 +47,8 @@ The application uses a trait-based presentation pattern (`Present` trait in src/
 ### Data Flow
 
 1. **Authentication**: Uses AWS SDK default credential chain via `aws_config::load_from_env()`
-2. **Load Balancer Selection**: Either CLI arg or interactive fzf selection (src/main.rs:129)
-3. **Parallel Fetching**: Two concurrent tasks fetch listener/rule hierarchy and target group/target hierarchy (src/main.rs:194-268)
+2. **Load Balancer Selection**: Either CLI arg or interactive skim selection (src/main.rs:144)
+3. **Parallel Fetching**: Two concurrent tasks fetch listener/rule hierarchy and target group/target hierarchy
 4. **Display**: Results are collected as `Box<dyn Present>` and rendered in order
 
 ### AWS Resource Hierarchy
@@ -72,4 +72,4 @@ Both tasks return `Vec<Box<dyn Present>>` which are then displayed sequentially.
 
 ## External Dependencies
 
-- **fzf**: Required for interactive load balancer selection when no ARN is provided
+None.
