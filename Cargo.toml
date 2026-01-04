@@ -10,7 +10,7 @@ aws-sdk-elasticloadbalancingv2 = "1.104.0"
 clap = { version = "4.5.54", features = ["derive"] }
 color-eyre = "0.6.5"
 crossbeam = "0.8"
-skim = "0.10.4"
+skim = "0.20.5"
 tokio = { version = "1.49.0", features = ["full"] }
 
 [dev-dependencies]
