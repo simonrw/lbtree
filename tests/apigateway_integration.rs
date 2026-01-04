@@ -1,5 +1,7 @@
 mod common;
 
+use std::time::Duration;
+
 use aws_sdk_apigateway::Client as ApiGatewayClient;
 use lbtree::present::BufferWriter;
 use uuid::Uuid;
@@ -9,6 +11,7 @@ struct ApiGatewayTestFixture {
     client: ApiGatewayClient,
     api_id: Option<String>,
     resource_ids: Vec<String>,
+    insta_settings: insta::Settings,
 }
 
 impl ApiGatewayTestFixture {
@@ -21,6 +24,7 @@ impl ApiGatewayTestFixture {
             client,
             api_id: None,
             resource_ids: Vec::new(),
+            insta_settings: insta::Settings::clone_current(),
         };
 
         fixture.setup().await?;
@@ -30,6 +34,7 @@ impl ApiGatewayTestFixture {
     async fn setup(&mut self) -> color_eyre::Result<()> {
         let test_id = Uuid::new_v4();
         let api_name = format!("test-api-{}", test_id);
+        self.insta_settings.add_filter(&api_name, "[api-name]");
 
         // Create REST API
         let api = self
@@ -40,8 +45,8 @@ impl ApiGatewayTestFixture {
             .send()
             .await?;
         self.api_id = api.id().map(|s| s.to_string());
-
         let api_id = self.api_id.as_ref().unwrap();
+        self.insta_settings.add_filter(&api_id, "[api-id]");
 
         // Get the root resource
         let resources = self
@@ -57,6 +62,7 @@ impl ApiGatewayTestFixture {
             .find(|r| r.path() == Some("/"))
             .and_then(|r| r.id())
             .unwrap();
+        self.insta_settings.add_filter(root_id, "[root-id]");
 
         // Create a resource path /users
         let users_resource = self
@@ -68,6 +74,7 @@ impl ApiGatewayTestFixture {
             .send()
             .await?;
         if let Some(id) = users_resource.id().map(|s| s.to_string()) {
+            self.insta_settings.add_filter(&id, "[users-resource-id]");
             self.resource_ids.push(id.clone());
 
             // Create GET method on /users
@@ -88,6 +95,7 @@ impl ApiGatewayTestFixture {
                 .rest_api_id(api_id)
                 .resource_id(&id)
                 .http_method("GET")
+                .integration_http_method("GET")
                 .r#type(aws_sdk_apigateway::types::IntegrationType::Mock)
                 .send()
                 .await?;
@@ -103,6 +111,8 @@ impl ApiGatewayTestFixture {
             .send()
             .await?;
         if let Some(id) = products_resource.id().map(|s| s.to_string()) {
+            self.insta_settings
+                .add_filter(&id, "[products-resource-id]");
             self.resource_ids.push(id.clone());
 
             // Create POST method on /products
@@ -123,6 +133,7 @@ impl ApiGatewayTestFixture {
                 .rest_api_id(api_id)
                 .resource_id(&id)
                 .http_method("POST")
+                .integration_http_method("POST")
                 .r#type(aws_sdk_apigateway::types::IntegrationType::Http)
                 .uri("http://example.com/products")
                 .send()
@@ -146,52 +157,20 @@ impl ApiGatewayTestFixture {
     }
 }
 
-impl Drop for ApiGatewayTestFixture {
-    fn drop(&mut self) {
-        // Spawn cleanup task without blocking to avoid nested runtime error
-        if let Some(api_id) = self.api_id.take() {
-            let client = self.client.clone();
-            // Spawn a detached task for cleanup - don't block on it
-            let _ = tokio::spawn(async move {
-                let _ = client.delete_rest_api().rest_api_id(api_id).send().await;
-            });
-        }
-    }
-}
-
-#[tokio::test]
-async fn test_apigateway_display() {
-    skip_if_localstack_unavailable!();
-
-    let fixture = ApiGatewayTestFixture::new()
-        .await
-        .expect("Failed to create test fixture");
-    let output = fixture
-        .run_display()
-        .await
-        .expect("Failed to display API Gateway");
-
-    // Verify output contains expected elements
-    assert!(output.contains("REST API"));
-    assert!(output.contains("/users"));
-    assert!(output.contains("/products"));
-    assert!(output.contains("GET"));
-    assert!(output.contains("POST"));
-    assert!(output.contains("Integration"));
-}
-
 #[tokio::test]
 async fn test_apigateway_display_snapshot() {
-    skip_if_localstack_unavailable!();
+    assert_localstack_available!();
 
-    let fixture = ApiGatewayTestFixture::new()
+    let mut fixture = ApiGatewayTestFixture::new()
         .await
         .expect("Failed to create test fixture");
-    let output = fixture
-        .run_display()
-        .await
-        .expect("Failed to display API Gateway");
+    let output = fixture.run_display().await;
+
+    fixture.cleanup().await;
+    let output = output.expect("error with test");
 
     // Use insta for snapshot testing
-    insta::assert_snapshot!(output);
+    fixture.insta_settings.bind(|| {
+        insta::assert_snapshot!(output);
+    });
 }

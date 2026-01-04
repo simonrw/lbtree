@@ -29,12 +29,11 @@ pub async fn is_localstack_available() -> bool {
 
 /// Skip test if LocalStack is not available
 #[macro_export]
-macro_rules! skip_if_localstack_unavailable {
+macro_rules! assert_localstack_available {
     () => {
-        if !common::is_localstack_available().await {
-            eprintln!("Skipping test: LocalStack not available at http://localhost:4566");
-            eprintln!("Start LocalStack with: docker run --rm -d -p 4566:4566 localstack/localstack");
-            return;
-        }
+        assert!(
+            common::is_localstack_available().await,
+            "LocalStack is not available"
+        );
     };
 }
