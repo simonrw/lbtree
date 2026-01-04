@@ -22,13 +22,14 @@ struct Cli {
 #[derive(Subcommand)]
 enum Commands {
     /// Display Application Load Balancer tree
-    Alb {
+    Elbv2 {
         /// ARN of the load balancer (interactive selection if not provided)
         #[arg(short, long)]
         load_balancer_arn: Option<String>,
     },
 
     /// Display API Gateway REST API tree
+    #[clap(name = "apigateway")]
     ApiGateway {
         /// ID of the REST API (interactive selection if not provided)
         #[arg(short = 'i', long)]
@@ -113,7 +114,7 @@ async fn main() -> eyre::Result<()> {
     let writer = StdoutWriter;
 
     match cli.command {
-        Some(Commands::Alb { load_balancer_arn }) => {
+        Some(Commands::Elbv2 { load_balancer_arn }) => {
             alb::display_alb(&config, load_balancer_arn, &writer).await?;
         }
         Some(Commands::ApiGateway { api_id }) => {

@@ -7,7 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 `lbtree` is a Rust CLI tool that displays a tree representation of AWS resources.
 
 **Supported Resources:**
-- **Application Load Balancer (ALBv2)**: Shows hierarchical structure of load balancers, listeners, rules, actions, target groups, and targets
+- **Application Load Balancer (ELBv2)**: Shows hierarchical structure of load balancers, listeners, rules, actions, target groups, and targets
 - **API Gateway REST APIs**: Shows hierarchical structure of REST APIs, resources, methods, and integrations
 
 More resource types are planned for the future.
@@ -25,16 +25,16 @@ cargo build
 cargo run
 
 # Application Load Balancer with ARN specified
-cargo run -- alb --load-balancer-arn <ARN>
+cargo run -- elbv2 --load-balancer-arn <ARN>
 
 # Application Load Balancer interactive selection
-cargo run -- alb
+cargo run -- elbv2
 
 # API Gateway with REST API ID specified
-cargo run -- api-gateway --api-id <API_ID>
+cargo run -- apigateway --api-id <API_ID>
 
 # API Gateway interactive selection
-cargo run -- api-gateway
+cargo run -- apigateway 
 ```
 
 **Check/Lint:**
