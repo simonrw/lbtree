@@ -50,6 +50,9 @@ jobs:
         with:
           image-tag: 'latest'
           install-awslocal: 'true'
+          use-pro: true
+        env:
+          LOCALSTACK_AUTH_TOKEN: ${{ secrets.LOCALSTACK_AUTH_TOKEN }}
 
       - name: Run cargo check
         run: cargo check --verbose
