@@ -1,0 +1,12 @@
+---
+source: tests/apigateway_integration.rs
+expression: output
+---
+-> REST API "[api-name]" ([api-id])
+  -> / (id=[root-id])
+  -> /users (id=[users-resource-id])
+    -> GET auth=NONE
+      -> Integration type=Mock uri=none
+  -> /products (id=[products-resource-id])
+    -> POST auth=NONE
+      -> Integration type=Http uri=http://example.com/products
