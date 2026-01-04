@@ -18,11 +18,13 @@ pub async fn localstack_config() -> SdkConfig {
 
 /// Check if LocalStack is available at localhost:4566
 pub async fn is_localstack_available() -> bool {
-    let config = localstack_config().await;
-    let client = aws_sdk_elasticloadbalancingv2::Client::new(&config);
+    // Check LocalStack health endpoint
+    let health_url = "http://localhost:4566/_localstack/health";
 
-    // Try a simple AWS call to check if LocalStack is responding
-    client.describe_load_balancers().send().await.is_ok()
+    match reqwest::get(health_url).await {
+        Ok(response) => response.status().is_success(),
+        Err(_) => false,
+    }
 }
 
 /// Skip test if LocalStack is not available
