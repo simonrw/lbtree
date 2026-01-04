@@ -1,7 +1,5 @@
 mod common;
 
-use std::time::Duration;
-
 use aws_sdk_apigateway::Client as ApiGatewayClient;
 use lbtree::present::BufferWriter;
 use uuid::Uuid;
@@ -157,6 +155,13 @@ impl ApiGatewayTestFixture {
     }
 }
 
+impl Drop for ApiGatewayTestFixture {
+    fn drop(&mut self) {
+        // Note: Explicit async cleanup in the test is preferred
+        // This Drop impl serves as documentation that cleanup should be called
+    }
+}
+
 #[tokio::test]
 async fn test_apigateway_display_snapshot() {
     assert_localstack_available!();
@@ -164,10 +169,18 @@ async fn test_apigateway_display_snapshot() {
     let mut fixture = ApiGatewayTestFixture::new()
         .await
         .expect("Failed to create test fixture");
-    let output = fixture.run_display().await;
 
+    // Ensure cleanup runs even if the test fails
+    let result = async {
+        let output = fixture.run_display().await?;
+        Ok::<String, color_eyre::Report>(output)
+    }.await;
+
+    // Always cleanup, regardless of test success
     fixture.cleanup().await;
-    let output = output.expect("error with test");
+
+    // Now check the result
+    let output = result.expect("error with test");
 
     // Use insta for snapshot testing
     fixture.insta_settings.bind(|| {

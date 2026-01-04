@@ -18,13 +18,14 @@ pub async fn localstack_config() -> SdkConfig {
 
 /// Check if LocalStack is available at localhost:4566
 pub async fn is_localstack_available() -> bool {
-    // Check LocalStack health endpoint
-    let health_url = "http://localhost:4566/_localstack/health";
+    // Check if LocalStack port is open by attempting a TCP connection
+    use std::net::TcpStream;
+    use std::time::Duration;
 
-    match reqwest::get(health_url).await {
-        Ok(response) => response.status().is_success(),
-        Err(_) => false,
-    }
+    TcpStream::connect_timeout(
+        &"127.0.0.1:4566".parse().unwrap(),
+        Duration::from_millis(500)
+    ).is_ok()
 }
 
 /// Skip test if LocalStack is not available
