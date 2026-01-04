@@ -15,19 +15,28 @@ impl OutputWriter for StdoutWriter {
 }
 
 /// Buffer writer for capturing output in tests
+#[allow(dead_code)]
 pub struct BufferWriter {
     buffer: Arc<Mutex<String>>,
 }
 
 impl BufferWriter {
+    #[allow(dead_code)]
     pub fn new() -> Self {
         Self {
             buffer: Arc::new(Mutex::new(String::new())),
         }
     }
 
+    #[allow(dead_code)]
     pub fn get_output(&self) -> String {
         self.buffer.lock().unwrap().clone()
+    }
+}
+
+impl Default for BufferWriter {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

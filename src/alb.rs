@@ -174,8 +174,8 @@ async fn select_load_balancer(
 
     // Configure skim options
     let options = SkimOptionsBuilder::default()
-        .height(Some("50%"))
-        .prompt(Some("Select load balancer: "))
+        .height("50%".to_string())
+        .prompt("Select load balancer: ".to_string())
         .build()
         .map_err(|e| eyre::eyre!("building skim options: {}", e))?;
 
