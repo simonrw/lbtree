@@ -1,0 +1,12 @@
+{
+  "hooks": {
+    "SessionStart": {
+      "command": ".claude/session-start.sh",
+      "description": "Install and start LocalStack on session start"
+    },
+    "SessionEnd": {
+      "command": ".claude/session-end.sh",
+      "description": "Stop LocalStack on session end"
+    }
+  }
+}
