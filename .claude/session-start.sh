@@ -1,5 +1,11 @@
 #!/bin/bash
-set -e
+set -euo pipefail
+
+# Only run in Claude Code web environment
+if [ "${CLAUDE_CODE_REMOTE:-}" != "true" ]; then
+    echo "Not in Claude Code web environment, skipping session setup"
+    exit 0
+fi
 
 echo "Installing LocalStack CLI..."
 pip install --user localstack
