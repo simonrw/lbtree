@@ -1,0 +1,11 @@
+---
+source: tests/alb_integration.rs
+expression: output
+---
+-> Load balancer ([lb-dns-name])
+  -> Listener protocol=HTTP port=4566
+    -> Rule priority=100 is-default=false
+      -> Action (fixed-repsonse) msg=Some("OK") status-code=Some("200")
+    -> Rule priority=default is-default=true
+      -> Action (forward)
+  -> Target group "[tg-name]" protocol=HTTP port=80
