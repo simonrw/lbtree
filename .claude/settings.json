@@ -1,13 +1,11 @@
 {
   "hooks": {
     "SessionStart": {
-      "command": "bash",
-      "args": ["-c", "echo 'Installing LocalStack CLI...' && pip install --user localstack && echo 'Starting LocalStack...' && localstack start -d && echo 'Waiting for LocalStack to be ready...' && localstack wait -t 30 && echo 'LocalStack is ready!'"],
+      "command": ".claude/session-start.sh",
       "description": "Install and start LocalStack on session start"
     },
     "SessionEnd": {
-      "command": "bash",
-      "args": ["-c", "echo 'Stopping LocalStack...' && localstack stop && echo 'LocalStack stopped'"],
+      "command": ".claude/session-end.sh",
       "description": "Stop LocalStack on session end"
     }
   }
