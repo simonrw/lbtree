@@ -78,8 +78,8 @@ fn select_resource_type() -> eyre::Result<Option<ResourceType>> {
 
     // Configure skim options
     let options = SkimOptionsBuilder::default()
-        .height(Some("50%"))
-        .prompt(Some("Select resource type: "))
+        .height("50%".to_string())
+        .prompt("Select resource type: ".to_string())
         .build()
         .map_err(|e| eyre::eyre!("building skim options: {}", e))?;
 

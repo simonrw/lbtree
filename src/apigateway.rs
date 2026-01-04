@@ -121,8 +121,8 @@ async fn select_rest_api(
 
     // Configure skim options
     let options = SkimOptionsBuilder::default()
-        .height(Some("50%"))
-        .prompt(Some("Select REST API: "))
+        .height("50%".to_string())
+        .prompt("Select REST API: ".to_string())
         .build()
         .map_err(|e| eyre::eyre!("building skim options: {}", e))?;
 
