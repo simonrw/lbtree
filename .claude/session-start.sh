@@ -7,13 +7,6 @@ if [ "${CLAUDE_CODE_REMOTE:-}" != "true" ]; then
     exit 0
 fi
 
-echo "Installing LocalStack CLI..."
-pip install --user localstack
-
 echo "Starting LocalStack..."
-localstack start -d
-
-echo "Waiting for LocalStack to be ready..."
-localstack wait -t 30
-
-echo "LocalStack is ready!"
+docker compose up --wait --wait-timeout 300
+echo "LocalStack started"

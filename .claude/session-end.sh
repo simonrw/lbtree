@@ -9,5 +9,5 @@ if [ "${CLAUDE_CODE_REMOTE:-}" != "true" ]; then
 fi
 
 echo "Stopping LocalStack..."
-localstack stop
+docker compose down --timeout 300 --remove-orphans
 echo "LocalStack stopped"
