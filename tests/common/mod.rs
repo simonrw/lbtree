@@ -24,8 +24,9 @@ pub async fn is_localstack_available() -> bool {
 
     TcpStream::connect_timeout(
         &"127.0.0.1:4566".parse().unwrap(),
-        Duration::from_millis(500)
-    ).is_ok()
+        Duration::from_millis(500),
+    )
+    .is_ok()
 }
 
 /// Skip test if LocalStack is not available
