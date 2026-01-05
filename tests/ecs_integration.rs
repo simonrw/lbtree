@@ -2,6 +2,7 @@ mod common;
 
 use aws_sdk_ec2::Client as Ec2Client;
 use aws_sdk_ecs::Client as EcsClient;
+use aws_sdk_ecs::client::Waiters;
 use aws_sdk_ecs::types::{
     AssignPublicIp, AwsVpcConfiguration, Compatibility, ContainerDefinition, KeyValuePair,
     NetworkConfiguration, NetworkMode,
@@ -138,11 +139,12 @@ impl EcsTestFixture {
                 ContainerDefinition::builder()
                     .name("sidecar")
                     .image("busybox:latest")
-                    .essential(false)
+                    .essential(true)
                     .cpu(64)
                     .memory(128)
-                    .command("echo")
-                    .command("hello")
+                    .command("sh")
+                    .command("-c")
+                    .command("while true; do echo done; sleep 1; done")
                     .build(),
             )
             .send()
@@ -202,8 +204,13 @@ impl EcsTestFixture {
             "[task-id]",
         );
 
-        // Give LocalStack a moment to spin up tasks
-        tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+        // Wait for service to stabilize (tasks running)
+        self.ecs_client
+            .wait_until_services_stable()
+            .cluster(&cluster_arn)
+            .services(&service_arn)
+            .wait(std::time::Duration::from_secs(60))
+            .await?;
 
         Ok(())
     }
@@ -242,6 +249,14 @@ impl EcsTestFixture {
                 .service(service_arn)
                 .force(true)
                 .send()
+                .await;
+
+            let _ = self
+                .ecs_client
+                .wait_until_services_inactive()
+                .cluster(cluster_arn)
+                .services(service_arn)
+                .wait(std::time::Duration::from_secs(60))
                 .await;
         }
 

@@ -6,4 +6,4 @@ expression: output
   -> Service "[service-name]" status=ACTIVE desired=1 running=1 pending=0
     -> Task [task-id] status=RUNNING desired=RUNNING launch-type=FARGATE
       -> Container "app" image=nginx:latest status=RUNNING
-      -> Container "sidecar" image=busybox:latest status=STOPPED command=["echo", "hello"]
+      -> Container "sidecar" image=busybox:latest status=RUNNING command=["sh", "-c", "while true; do echo done; sleep 1; done"]
