@@ -174,7 +174,8 @@ async fn test_apigateway_display_snapshot() {
     let result = async {
         let output = fixture.run_display().await?;
         Ok::<String, color_eyre::Report>(output)
-    }.await;
+    }
+    .await;
 
     // Always cleanup, regardless of test success
     fixture.cleanup().await;

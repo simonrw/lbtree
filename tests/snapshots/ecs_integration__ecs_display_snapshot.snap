@@ -1,0 +1,9 @@
+---
+source: tests/ecs_integration.rs
+expression: output
+---
+-> Cluster "[cluster-name]" status=ACTIVE services=0 running-tasks=0 pending-tasks=0
+  -> Service "[service-name]" status=ACTIVE desired=1 running=1 pending=0
+    -> Task [task-id] status=RUNNING desired=RUNNING launch-type=FARGATE
+      -> Container "app" image=nginx:latest status=RUNNING
+      -> Container "sidecar" image=busybox:latest status=RUNNING command=["sh", "-c", "while true; do echo done; sleep 1; done"]

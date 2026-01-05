@@ -2,4 +2,5 @@
 
 pub mod alb;
 pub mod apigateway;
+pub mod ecs;
 pub mod present;

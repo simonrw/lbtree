@@ -1,5 +1,6 @@
 mod alb;
 mod apigateway;
+mod ecs;
 mod present;
 
 use clap::{Parser, Subcommand};
@@ -35,6 +36,17 @@ enum Commands {
         #[arg(short = 'i', long)]
         api_id: Option<String>,
     },
+
+    /// Display ECS service hierarchy
+    Ecs {
+        /// ARN of the cluster (interactive selection if not provided)
+        #[arg(short, long)]
+        cluster_arn: Option<String>,
+
+        /// ARN of the service (interactive selection if not provided)
+        #[arg(short, long)]
+        service_arn: Option<String>,
+    },
 }
 
 #[derive(Debug, Clone)]
@@ -47,6 +59,7 @@ struct ResourceTypeItem {
 enum ResourceType {
     Alb,
     ApiGateway,
+    Ecs,
 }
 
 impl SkimItem for ResourceTypeItem {
@@ -68,6 +81,10 @@ fn select_resource_type() -> eyre::Result<Option<ResourceType>> {
         ResourceTypeItem {
             display: "API Gateway REST API".to_string(),
             resource_type: ResourceType::ApiGateway,
+        },
+        ResourceTypeItem {
+            display: "ECS Service".to_string(),
+            resource_type: ResourceType::Ecs,
         },
     ];
 
@@ -120,6 +137,12 @@ async fn main() -> eyre::Result<()> {
         Some(Commands::ApiGateway { api_id }) => {
             apigateway::display_apigateway(&config, api_id, &writer).await?;
         }
+        Some(Commands::Ecs {
+            cluster_arn,
+            service_arn,
+        }) => {
+            ecs::display_ecs(&config, cluster_arn, service_arn, &writer).await?;
+        }
         None => {
             // No subcommand provided, show resource type selection
             match select_resource_type()? {
@@ -128,6 +151,9 @@ async fn main() -> eyre::Result<()> {
                 }
                 Some(ResourceType::ApiGateway) => {
                     apigateway::display_apigateway(&config, None, &writer).await?;
+                }
+                Some(ResourceType::Ecs) => {
+                    ecs::display_ecs(&config, None, None, &writer).await?;
                 }
                 None => {
                     eprintln!("No resource type selected");

@@ -68,7 +68,10 @@ impl Present for Method {
 
 impl Present for Integration {
     fn content(&self) -> String {
-        let integration_type = self.r#type().map(|t| format!("{:?}", t)).unwrap_or("unknown".to_string());
+        let integration_type = self
+            .r#type()
+            .map(|t| format!("{:?}", t))
+            .unwrap_or("unknown".to_string());
         let uri = self.uri().unwrap_or("none");
         format!("Integration type={} uri={}", integration_type, uri)
     }
@@ -79,9 +82,7 @@ impl Present for Integration {
 }
 
 /// Let the user choose the REST API to use
-async fn select_rest_api(
-    client: &aws_sdk_apigateway::Client,
-) -> eyre::Result<Option<String>> {
+async fn select_rest_api(client: &aws_sdk_apigateway::Client) -> eyre::Result<Option<String>> {
     // Create crossbeam channel for streaming items to skim
     let (tx, rx): (SkimItemSender, SkimItemReceiver) = unbounded();
 
@@ -92,7 +93,11 @@ async fn select_rest_api(
     let fetch_handle = tokio::spawn(async move {
         let result: eyre::Result<()> = async {
             // Fetch REST APIs (API Gateway doesn't have a paginator for get_rest_apis)
-            let response = client.get_rest_apis().send().await.context("fetching REST APIs")?;
+            let response = client
+                .get_rest_apis()
+                .send()
+                .await
+                .context("fetching REST APIs")?;
 
             // Send each API to skim immediately
             for api in response.items() {
@@ -226,8 +231,12 @@ pub async fn display_apigateway(
                     }
                     Err(e) => {
                         // Some methods might not have integrations, just skip
-                        eprintln!("Warning: Could not fetch integration for {} {}: {}",
-                            resource.path().unwrap_or("unknown"), http_method, e);
+                        eprintln!(
+                            "Warning: Could not fetch integration for {} {}: {}",
+                            resource.path().unwrap_or("unknown"),
+                            http_method,
+                            e
+                        );
                     }
                 }
             }
