@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-aws-config = { version = "1.8.11", features = ["behavior-version-latest"] }
+aws-config = { version = "1.8.12", features = ["behavior-version-latest"] }
 aws-sdk-apigateway = "1"
 aws-sdk-ecs = "1"
 aws-sdk-elasticloadbalancingv2 = "1.104.0"
